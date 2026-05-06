@@ -9,7 +9,11 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Sidebar from '@/components/layout/Sidebar';
-import api from '@/lib/api';
+import api, {
+  getAnalisisRiesgos, saveAnalisisRiesgos,
+  getEnsayosPrestaciones, saveEnsayosPrestaciones,
+  type AnalisisRiesgoItem, type EnsayoPrestacionItem,
+} from '@/lib/api';
 
 async function descargarPdf(url: string, nombre: string) {
   const token = localStorage.getItem('token');
@@ -43,7 +47,7 @@ const CATEGORIAS_COMPONENTE = [
   'pulsador','radar','cremallera','brazo','variador','encoder','celula_seguridad','otro',
 ];
 
-type Pestaña = 'informacion' | 'expediente_ce' | 'componentes' | 'historial';
+type Pestaña = 'informacion' | 'expediente_ce' | 'analisis_riesgos' | 'ensayos' | 'componentes' | 'historial';
 
 function Campo({ label, valor }: { label: string; valor?: string | number | null }) {
   return (
@@ -417,6 +421,299 @@ function TabComponentes({ equipoId }: { equipoId: string }) {
   );
 }
 
+// ─── Subcomponente: Tab Análisis de Riesgos ──────────────────────────────────
+function TabAnalisisRiesgos({ equipoId }: { equipoId: string }) {
+  const [items, setItems] = useState<AnalisisRiesgoItem[]>([]);
+  const [cargando, setCargando] = useState(true);
+  const [guardando, setGuardando] = useState(false);
+  const [guardado, setGuardado] = useState(false);
+  const [expandido, setExpandido] = useState<number | null>(null);
+
+  useEffect(() => {
+    getAnalisisRiesgos(Number(equipoId))
+      .then(res => setItems(res.data))
+      .finally(() => setCargando(false));
+  }, [equipoId]);
+
+  const setEstado = (idx: number, estado: AnalisisRiesgoItem['estado']) => {
+    setItems(prev => prev.map((it, i) => i === idx ? { ...it, estado } : it));
+  };
+
+  const setObs = (idx: number, observaciones: string) => {
+    setItems(prev => prev.map((it, i) => i === idx ? { ...it, observaciones } : it));
+  };
+
+  const guardar = async () => {
+    setGuardando(true);
+    try {
+      const res = await saveAnalisisRiesgos(Number(equipoId), items);
+      setItems(res.data);
+      setGuardado(true);
+      setTimeout(() => setGuardado(false), 2500);
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  if (cargando) return <div className="p-8 text-center text-gray-400">Cargando análisis de riesgos...</div>;
+
+  const cumple    = items.filter(i => i.estado === 'cumple').length;
+  const noCumple  = items.filter(i => i.estado === 'no_cumple').length;
+  const noAplica  = items.filter(i => i.estado === 'no_aplica').length;
+
+  // Agrupar por categoría
+  const categorias = Array.from(new Set(items.map(i => i.categoria)));
+
+  return (
+    <div className="space-y-4">
+      {/* Resumen */}
+      <div className="bg-white rounded-xl border border-gray-100 p-5 flex items-center gap-6">
+        <div className="flex-1">
+          <h3 className="font-semibold text-gray-900 mb-1">Análisis de riesgos (ISO 12100 / UNE-EN 13241)</h3>
+          <p className="text-xs text-gray-400">{items.length} requisitos evaluados</p>
+        </div>
+        <div className="flex gap-4 text-center">
+          <div>
+            <div className="text-2xl font-bold text-green-600">{cumple}</div>
+            <div className="text-xs text-gray-500">Cumple</div>
+          </div>
+          <div>
+            <div className="text-2xl font-bold text-red-500">{noCumple}</div>
+            <div className="text-xs text-gray-500">No cumple</div>
+          </div>
+          <div>
+            <div className="text-2xl font-bold text-gray-400">{noAplica}</div>
+            <div className="text-xs text-gray-500">No aplica</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          {guardado && <span className="text-xs text-green-600 font-medium">✓ Guardado</span>}
+          <button
+            onClick={guardar}
+            disabled={guardando}
+            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          >
+            {guardando ? 'Guardando...' : 'Guardar análisis'}
+          </button>
+        </div>
+      </div>
+
+      {/* Lista por categoría */}
+      {categorias.map(cat => {
+        const requisitos = items.map((it, idx) => ({ ...it, _idx: idx })).filter(it => it.categoria === cat);
+        return (
+          <div key={cat} className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+            <div className="bg-gray-50 px-5 py-3 border-b border-gray-100">
+              <h4 className="font-semibold text-sm text-gray-700">{cat}</h4>
+            </div>
+            <div className="divide-y divide-gray-50">
+              {requisitos.map(({ _idx, ...it }) => (
+                <div key={it.requisito} className="px-5 py-3">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex-1">
+                      <p className="text-sm text-gray-800">{it.requisito}</p>
+                      {expandido === _idx && (
+                        <textarea
+                          className="mt-2 w-full border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
+                          rows={2}
+                          placeholder="Observaciones..."
+                          value={it.observaciones ?? ''}
+                          onChange={e => setObs(_idx, e.target.value)}
+                        />
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {/* Botones de estado */}
+                      {(['cumple', 'no_cumple', 'no_aplica'] as const).map(estado => (
+                        <button
+                          key={estado}
+                          onClick={() => setEstado(_idx, estado)}
+                          className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${
+                            it.estado === estado
+                              ? estado === 'cumple'     ? 'bg-green-500 text-white'
+                              : estado === 'no_cumple' ? 'bg-red-500 text-white'
+                              :                          'bg-gray-400 text-white'
+                              : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                          }`}
+                        >
+                          {estado === 'cumple' ? 'CUMPLE' : estado === 'no_cumple' ? 'NO CUMPLE' : 'NO APLICA'}
+                        </button>
+                      ))}
+                      <button
+                        onClick={() => setExpandido(expandido === _idx ? null : _idx)}
+                        className="text-gray-400 hover:text-gray-600 text-xs px-2"
+                        title="Observaciones"
+                      >
+                        {expandido === _idx ? '▲' : '▼'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Subcomponente: Tab Ensayos de Prestaciones ───────────────────────────────
+function TabEnsayosPrestaciones({ equipoId }: { equipoId: string }) {
+  const [items, setItems] = useState<EnsayoPrestacionItem[]>([]);
+  const [cargando, setCargando] = useState(true);
+  const [guardando, setGuardando] = useState(false);
+  const [guardado, setGuardado] = useState(false);
+
+  useEffect(() => {
+    getEnsayosPrestaciones(Number(equipoId))
+      .then(res => setItems(res.data))
+      .finally(() => setCargando(false));
+  }, [equipoId]);
+
+  const setFuerza = (idx: number, fuerza_obtenida: string) => {
+    const val = fuerza_obtenida === '' ? null : parseFloat(fuerza_obtenida);
+    setItems(prev => prev.map((it, i) => {
+      if (i !== idx) return it;
+      const conforme = val !== null ? val <= it.fuerza_limite : null;
+      return { ...it, fuerza_obtenida: val, conforme };
+    }));
+  };
+
+  const setLimite = (idx: number, fuerza_limite: string) => {
+    const lim = parseFloat(fuerza_limite) || 150;
+    setItems(prev => prev.map((it, i) => {
+      if (i !== idx) return it;
+      const conforme = it.fuerza_obtenida !== null && it.fuerza_obtenida !== undefined
+        ? it.fuerza_obtenida <= lim : null;
+      return { ...it, fuerza_limite: lim, conforme };
+    }));
+  };
+
+  const setObs = (idx: number, observaciones: string) => {
+    setItems(prev => prev.map((it, i) => i === idx ? { ...it, observaciones } : it));
+  };
+
+  const guardar = async () => {
+    setGuardando(true);
+    try {
+      const res = await saveEnsayosPrestaciones(Number(equipoId), items);
+      setItems(res.data);
+      setGuardado(true);
+      setTimeout(() => setGuardado(false), 2500);
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  if (cargando) return <div className="p-8 text-center text-gray-400">Cargando ensayos...</div>;
+
+  const totalConValor = items.filter(i => i.fuerza_obtenida !== null && i.fuerza_obtenida !== undefined).length;
+  const todoConforme = totalConValor > 0 && items.filter(i => i.fuerza_obtenida !== null).every(i => i.conforme);
+
+  const renderTabla = (tipo: 'apertura' | 'cierre') => {
+    const filas = items.map((it, idx) => ({ ...it, _idx: idx })).filter(it => it.tipo === tipo);
+    return (
+      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <div className="bg-gray-50 px-5 py-3 border-b border-gray-100">
+          <h4 className="font-semibold text-sm text-gray-700 capitalize">{tipo} de puerta</h4>
+        </div>
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 border-b border-gray-100">
+            <tr>
+              <th className="text-left px-4 py-2 font-medium text-gray-600 text-xs">Punto de medición</th>
+              <th className="text-left px-4 py-2 font-medium text-gray-600 text-xs">Fuerza obtenida (N)</th>
+              <th className="text-left px-4 py-2 font-medium text-gray-600 text-xs">Límite (N)</th>
+              <th className="text-left px-4 py-2 font-medium text-gray-600 text-xs">Resultado</th>
+              <th className="text-left px-4 py-2 font-medium text-gray-600 text-xs">Obs.</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {filas.map(({ _idx, ...it }) => (
+              <tr key={it.punto} className="hover:bg-gray-50">
+                <td className="px-4 py-3 text-gray-700 font-medium">{it.punto}</td>
+                <td className="px-4 py-3">
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.1}
+                    value={it.fuerza_obtenida ?? ''}
+                    onChange={e => setFuerza(_idx, e.target.value)}
+                    placeholder="—"
+                    className="w-24 border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                </td>
+                <td className="px-4 py-3">
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.1}
+                    value={it.fuerza_limite}
+                    onChange={e => setLimite(_idx, e.target.value)}
+                    className="w-20 border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                </td>
+                <td className="px-4 py-3">
+                  {it.fuerza_obtenida !== null && it.fuerza_obtenida !== undefined ? (
+                    <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+                      it.conforme ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                    }`}>
+                      {it.conforme ? 'CONFORME' : 'NO CONFORME'}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-gray-400">Sin medir</span>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  <input
+                    type="text"
+                    value={it.observaciones ?? ''}
+                    onChange={e => setObs(_idx, e.target.value)}
+                    placeholder="Opcional"
+                    className="w-28 border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Cabecera con resultado global */}
+      <div className="bg-white rounded-xl border border-gray-100 p-5 flex items-center gap-6">
+        <div className="flex-1">
+          <h3 className="font-semibold text-gray-900 mb-1">Ensayos de prestaciones (UNE-EN 12453)</h3>
+          <p className="text-xs text-gray-400">Medición de fuerzas de impacto en puntos de control</p>
+        </div>
+        {totalConValor > 0 && (
+          <div className={`text-sm font-bold px-4 py-2 rounded-lg ${
+            todoConforme ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+          }`}>
+            {todoConforme ? '✓ CONFORME' : '✗ NO CONFORME'}
+          </div>
+        )}
+        <div className="flex items-center gap-3">
+          {guardado && <span className="text-xs text-green-600 font-medium">✓ Guardado</span>}
+          <button
+            onClick={guardar}
+            disabled={guardando}
+            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          >
+            {guardando ? 'Guardando...' : 'Guardar ensayos'}
+          </button>
+        </div>
+      </div>
+
+      {renderTabla('apertura')}
+      {renderTabla('cierre')}
+    </div>
+  );
+}
+
 // ─── Página principal ─────────────────────────────────────────────────────────
 export default function EquipoDetallePage() {
   const { id } = useParams<{ id: string }>();
@@ -461,10 +758,12 @@ export default function EquipoDetallePage() {
   if (!equipo) return null;
 
   const pestañas: { id: Pestaña; label: string }[] = [
-    { id: 'informacion',   label: 'Información' },
-    { id: 'expediente_ce', label: 'Expediente CE' },
-    { id: 'componentes',   label: 'Componentes' },
-    { id: 'historial',     label: 'Historial' },
+    { id: 'informacion',      label: 'Información' },
+    { id: 'expediente_ce',    label: 'Expediente CE' },
+    { id: 'analisis_riesgos', label: 'Análisis de Riesgos' },
+    { id: 'ensayos',          label: 'Ensayos' },
+    { id: 'componentes',      label: 'Componentes' },
+    { id: 'historial',        label: 'Historial' },
   ];
 
   return (
@@ -562,6 +861,16 @@ export default function EquipoDetallePage() {
           {/* Tab: Expediente CE */}
           {pestaña === 'expediente_ce' && (
             <TabCE equipo={equipo} onGuardado={setEquipo} />
+          )}
+
+          {/* Tab: Análisis de Riesgos */}
+          {pestaña === 'analisis_riesgos' && (
+            <TabAnalisisRiesgos equipoId={id} />
+          )}
+
+          {/* Tab: Ensayos de Prestaciones */}
+          {pestaña === 'ensayos' && (
+            <TabEnsayosPrestaciones equipoId={id} />
           )}
 
           {/* Tab: Componentes */}

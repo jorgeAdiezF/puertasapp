@@ -11,6 +11,8 @@ use App\Http\Controllers\Api\ContratoController;
 use App\Http\Controllers\Api\AgendaController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\PdfController;
+use App\Http\Controllers\Api\AnalisisRiesgoController;
+use App\Http\Controllers\Api\EnsayoPrestacionController;
 
 /*
 |--------------------------------------------------------------------------
@@ -63,6 +65,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('agenda', AgendaController::class);
     Route::get('agenda/hoy',   [AgendaController::class, 'hoy']);
     Route::get('agenda/semana',[AgendaController::class, 'semana']);
+
+    // --- Análisis de riesgos CE ---
+    Route::get('equipos/{equipo}/analisis-riesgos',  [AnalisisRiesgoController::class, 'index']);
+    Route::post('equipos/{equipo}/analisis-riesgos', [AnalisisRiesgoController::class, 'bulkUpdate']);
+
+    // --- Ensayos de prestaciones CE ---
+    Route::get('equipos/{equipo}/ensayos-prestaciones',  [EnsayoPrestacionController::class, 'index']);
+    Route::post('equipos/{equipo}/ensayos-prestaciones', [EnsayoPrestacionController::class, 'bulkUpdate']);
 
     // --- PDF ---
     Route::get('equipos/{equipo}/pdf',      [PdfController::class, 'fichaEquipo']);

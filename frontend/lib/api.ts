@@ -36,4 +36,39 @@ api.interceptors.response.use(
   }
 );
 
+// --- Análisis de riesgos ---
+export const getAnalisisRiesgos = (equipoId: number) =>
+  api.get(`/equipos/${equipoId}/analisis-riesgos`);
+
+export const saveAnalisisRiesgos = (equipoId: number, items: AnalisisRiesgoItem[]) =>
+  api.post(`/equipos/${equipoId}/analisis-riesgos`, { items });
+
+// --- Ensayos de prestaciones ---
+export const getEnsayosPrestaciones = (equipoId: number) =>
+  api.get(`/equipos/${equipoId}/ensayos-prestaciones`);
+
+export const saveEnsayosPrestaciones = (equipoId: number, items: EnsayoPrestacionItem[]) =>
+  api.post(`/equipos/${equipoId}/ensayos-prestaciones`, { items });
+
+// --- Tipos ---
+export interface AnalisisRiesgoItem {
+  id?: number | null;
+  equipo_id?: number;
+  categoria: string;
+  requisito: string;
+  estado: 'cumple' | 'no_cumple' | 'no_aplica';
+  observaciones?: string | null;
+}
+
+export interface EnsayoPrestacionItem {
+  id?: number | null;
+  equipo_id?: number;
+  tipo: 'apertura' | 'cierre';
+  punto: string;
+  fuerza_obtenida?: number | null;
+  fuerza_limite: number;
+  conforme?: boolean | null;
+  observaciones?: string | null;
+}
+
 export default api;

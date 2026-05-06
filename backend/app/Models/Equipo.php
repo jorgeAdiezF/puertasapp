@@ -115,9 +115,19 @@ class Equipo extends Model
         return $this->hasOne(QrToken::class, 'equipo_id')->where('activo', true);
     }
 
+    public function analisisRiesgos(): HasMany
+    {
+        return $this->hasMany(AnalisisRiesgo::class, 'equipo_id');
+    }
+
+    public function ensayosPrestaciones(): HasMany
+    {
+        return $this->hasMany(EnsayoPrestacion::class, 'equipo_id');
+    }
+
     // --- Accessors ---
 
-    // Porcentaje de completitud del expediente CE
+    // Porcentaje de completitud del expediente CE (9 items: 7 campos booleanos + análisis riesgos + ensayos)
     public function getCompletitudCeAttribute(): int
     {
         $campos = [
@@ -126,7 +136,17 @@ class Equipo extends Model
             'libro_mantenimiento_activo', 'evaluacion_riesgos_realizada',
         ];
         $completados = collect($campos)->filter(fn($c) => (bool) $this->$c)->count();
-        return (int) round(($completados / count($campos)) * 100);
+
+        // +1 si hay algún requisito de análisis de riesgos con estado distinto de no_aplica
+        if ($this->analisisRiesgos()->whereIn('estado', ['cumple', 'no_cumple'])->exists()) {
+            $completados++;
+        }
+        // +1 si hay ensayos de prestaciones registrados
+        if ($this->ensayosPrestaciones()->whereNotNull('fuerza_obtenida')->exists()) {
+            $completados++;
+        }
+
+        return (int) round(($completados / (count($campos) + 2)) * 100);
     }
 
     // ¿Tiene revisión vencida?
