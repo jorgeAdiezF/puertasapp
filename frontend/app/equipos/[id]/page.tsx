@@ -187,18 +187,22 @@ function TabCE({ equipo, onGuardado }: { equipo: any; onGuardado: (nuevo: any) =
       </div>
 
       {/* Normas aplicables */}
-      {equipo.tipo_equipo?.normas_aplicables?.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-100 p-6">
-          <h3 className="font-semibold text-gray-900 mb-3">Normativa aplicable</h3>
-          <div className="flex flex-wrap gap-2">
-            {equipo.tipo_equipo.normas_aplicables.map((norma: string) => (
-              <span key={norma} className="bg-blue-50 text-blue-700 text-xs px-3 py-1 rounded-full font-medium">
-                {norma}
-              </span>
-            ))}
+      {(() => {
+        const raw = equipo.tipo_equipo?.normas_aplicables;
+        const normas: string[] = Array.isArray(raw) ? raw : (typeof raw === 'string' ? JSON.parse(raw) : []);
+        return normas.length > 0 ? (
+          <div className="bg-white rounded-xl border border-gray-100 p-6">
+            <h3 className="font-semibold text-gray-900 mb-3">Normativa aplicable</h3>
+            <div className="flex flex-wrap gap-2">
+              {normas.map((norma: string) => (
+                <span key={norma} className="bg-blue-50 text-blue-700 text-xs px-3 py-1 rounded-full font-medium">
+                  {norma}
+                </span>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        ) : null;
+      })()}
     </div>
   );
 }
