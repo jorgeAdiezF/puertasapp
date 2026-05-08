@@ -33,10 +33,10 @@ class EquipoController extends Controller
         if ($request->filled('buscar')) {
             $b = $request->buscar;
             $query->where(function ($q) use ($b) {
-                $q->where('descripcion_corta', 'ilike', "%{$b}%")
-                  ->orWhere('codigo_equipo', 'ilike', "%{$b}%")
-                  ->orWhere('numero_serie', 'ilike', "%{$b}%")
-                  ->orWhere('modelo', 'ilike', "%{$b}%");
+                $q->where('descripcion_corta', 'like', "%{$b}%")
+                  ->orWhere('codigo_equipo', 'like', "%{$b}%")
+                  ->orWhere('numero_serie', 'like', "%{$b}%")
+                  ->orWhere('modelo', 'like', "%{$b}%");
             });
         }
         // Equipos con revisión vencida

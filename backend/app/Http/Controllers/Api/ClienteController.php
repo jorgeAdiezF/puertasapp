@@ -20,10 +20,10 @@ class ClienteController extends Controller
         if ($request->filled('buscar')) {
             $buscar = $request->buscar;
             $query->where(function ($q) use ($buscar) {
-                $q->where('razon_social', 'ilike', "%{$buscar}%")
-                  ->orWhere('nombre_comercial', 'ilike', "%{$buscar}%")
-                  ->orWhere('cif_nif', 'ilike', "%{$buscar}%")
-                  ->orWhere('codigo_interno', 'ilike', "%{$buscar}%");
+                $q->where('razon_social', 'like', "%{$buscar}%")
+                  ->orWhere('nombre_comercial', 'like', "%{$buscar}%")
+                  ->orWhere('cif_nif', 'like', "%{$buscar}%")
+                  ->orWhere('codigo_interno', 'like', "%{$buscar}%");
             });
         }
 
